@@ -1,0 +1,297 @@
+DNS
+server - 
+sudo su
+dnf install bind bind-utils -y
+
+nano /etc/named.conf
+	listen-on port 53 { ip addr };
+	listen-on v6 port 53 { any; };
+	allow-query     { any; };
+
+	forwarders {
+	8.8.8.8;
+	8.8.4.4;
+	};
+
+	zone "student.in" IN {
+	type master;
+	file "dns-student.in";
+	};
+
+cd /var/named
+nano dns-student.in
+	student.in. 3600 IN SOA student.in. root.student.in. (
+				20032026
+				1D
+				3H
+				1W
+				1H )
+	student.in. 3600 IN NS ns.student.in.
+	ns.student.in. 3600 IN A ip adr
+	www.student.in. 3600 IN A 192.168.0.1
+
+chmod 777 /var/named/dns-student.in
+named-checkconf
+named-checkzone student.in /var/named/dns-student.in
+
+systemctl stop firewalld
+systemctl disable firewalld
+iptables -F
+
+systemctl start named
+systemctl enable named
+systemctl status named
+
+client - 
+nslookup
+server ip addr
+ns.student.in
+www.student.in
+
+Samba
+server-
+sudo su
+dnf install samba samba-client -y
+cp /etc/samba/smb.conf /etc/samba/smb.conf.original
+systemctl stop firewalld.service
+iptables -F
+setenforce 0
+systemctl start smb
+systemctl enable smb
+systemctl status smb
+
+mkdir -p /srv/samba/public
+chmod 0777 /srv/samba/public
+chown nobody:nobody /srv/samba/public
+
+nano /etc/samba/smb.conf
+	[public]
+	comment = Public Share
+	path = /srv/samba/public
+	browseable = yes
+	writable = yes
+	guest ok = yes
+	read only = n0
+	create mask = 0664
+	directory mask = 0775
+	[private]
+	comment = Private Share
+	path = /srv/samba/private
+	browseable = yes
+	writable = yes
+	read only = n0
+	valid users = @smbshare
+	write list = @smbshare
+	create mask = 0770
+	directory mask = 0770
+	force group = smbshare
+
+systemctl restart smb
+testparm
+systemctl enable --now smb nmb
+
+useradd -s /sin/nologin -M smbuser1
+useradd -s /sin/nologin -M smbuser2
+groupadd smbshare
+usermod -aG smbshare smbuser1
+usermod -aG smbshare smbuser2
+smbpasswd -a smbuser1
+	1234
+smbpasswd -a smbuser2
+	1234
+
+mkdir -p /srv/samba/private
+chmod 2770 /srv/samba/private
+chown -R root:smbshare /srv/samba/public
+
+systemctl restart smb nmb
+vi /srv/samba/private/test.txt
+	Helo
+
+client- 
+win+r - \\ip addr
+username: smbuser1
+pass: 1234
+
+
+Apache
+server-
+sudo su
+dnf install httpd -y
+systemctl start httpd
+systemctl enable httpd
+systemctl status httpd
+
+systemctl stop firewalld
+systemctl disable firewalld
+iptables -F
+ip addr
+
+cd /var/www/html/
+nano /var/www/html/index.html
+	<html><body>
+	<h>Apache Server Working</h1>
+	<h2>Student Name</h2>
+	<body></html>
+chmod 777 /var/www/html/index.html
+
+mkdir -p /var/www/cdacec
+mkdir -p /var/www/cdackp
+nano /var/www/cdacec
+	<html><body>
+	<h>www.cdacec.in running on port 8080</h1>
+	<body></html>
+nano /var/www/cdackp
+	<html><body>
+	<h>www.cdackp.in running on port 8081</h1>
+	<body></html>
+
+nano /etc/httpd/conf/httpd.conf
+(at last)
+	Listen 8080
+	Listen 8081
+	<VirtualHost *:8080>
+	ServerName www.cdacec.in
+	DocumentRoot /var/www/cdacec
+	</VirtualHost>
+	<VirtualHost *:8081>
+	ServerName www.cdackp.in
+	DocumentRoot /var/www/cdackp
+	</VirtualHost>
+
+systemctl restart httpd
+systemctl status httpd
+
+client- 
+http://ip addr
+http://www.cdacec.in:8080
+http://www.cdackp.in:8081
+
+
+SSH
+server - 
+install,connect,create file
+sudo su
+dnf install openssh-server -y
+
+systemctl start sshd
+systemctl enable sshd
+systemctl status sshd
+
+systemctl stop firewalld
+systemctl disable firewalld
+iptables -F
+setenforce 0
+ip addr
+
+client - 
+ssh root@ip addr
+touch 01010101.txt
+ls
+
+ssh root login
+server- 
+su -
+nano /etc/ssh/sshd_config
+	PermitRootLogin yes
+	PasswordAuthentication yes
+
+systemctl restart sshd
+passwd root
+	passwd@123
+
+client- login with pass
+ssh root@ip addr
+whoami
+
+ssh port 
+server-
+sudo su
+nano /etc/ssh/sshd_config
+	Find: 	#Port 22
+	Change: Port 8080
+systemctl restart sshd
+
+client-
+ssh -p 8080 root@server_ip
+
+
+FTP Client-Server Assignment
+server- 
+dnf install vsftpd -y
+systemctl start vsftpd
+systemctl enable vsftpd
+
+systemctl stop firewalld
+systemctl disable firewalld
+
+nano /etc/vsftpd/vsftpd.conf
+	anonymous_enable=NO
+	local_enable=YES
+	write_enable=YES
+
+systemctl restart vsftpd
+touch test.txt
+
+useradd ftpuser1
+passwd ftpuser1
+	passwd@123
+mkdir /home/ftpuser1/files
+chmod 755 /home/ftpuser1
+chown ftpuser1:ftpuser1 /home/ftpuser1/files
+
+echo "FTP Test File" > test.txt
+ftp localhost
+	name:ftpuser1
+	passwd:passwd@123
+	>ftp>put test.txt
+	>ftp>bye
+
+client-
+dnf install ftp -y
+ftp localhost
+	name:ftpuser1
+	passwd:passwd@123
+	ftp>get test.txt
+	ftp>bye
+
+Shell Script
+vi even_odd.sh
+	#!/bin/bash
+	echo "Enter number"
+	read n
+	if (($n%2 = = 0))
+	then 
+		echo "Even"
+	else
+		echo "Odd"
+	fi
+chmod +x even_odd.sh
+./even_odd.sh
+
+vi biggest.sh
+	#!/bin/bash
+	echo "Enter 3 numbers"
+	read a b c
+	if (( $a>=$b && $a>=$c))
+	then
+		echo "$a is biggest"
+	elif (( $b>=$a && $b>=$c))
+	then
+		echo "$b is biggest"
+	else
+		echo "$c is biggest"
+	fi
+chmod +x biggest.sh
+./biggest.sh
+
+vi table.sh
+	#!/bin/bash
+	echo "Enter no"
+	read n
+	for i in {1..10}
+	do
+		echo"$n x $i = $((n*i))"
+	done
+chmod +x table.sh
+./table.sh
