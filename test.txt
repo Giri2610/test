@@ -16,11 +16,11 @@ nano /etc/named.conf
 cd /var/named
 nano dns-student.in
 	student.in. 3600 IN SOA student.in. root.student.in. (
-							20032026
-							1D
-							3H
-							1W
-							1H )
+							20032026;
+							1D;
+							3H;
+							1W;
+							1H; )
 	student.in. 3600 IN NS ns.student.in.
 	ns.student.in. 3600 IN A ip adr
 	www.student.in. 3600 IN A 192.168.0.1
@@ -63,11 +63,11 @@ named-checkconf /etc/named.conf
 cd /var/named
 vi dns-student.in
 	student.in. 3600 IN SOA student.in. root.student.in. (
-							20032026
-							1D
-							3H
-							1W
-							1H )
+							20032026;
+							1D;
+							3H;
+							1W;
+							1H; )
 	student.in. 3600 IN NS ns.student.in.
 	ns.student.in. 3600 IN A ip adr           #(master)
 	www.student.in. 3600 IN A 192.168.0.1    #(can be anything)
