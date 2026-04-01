@@ -27,7 +27,7 @@ nano dns-student.in
 
 chmod 777 /var/named/dns-student.in
 named-checkconf
-named-checkzone student.in /var/named/dns-student.in
+named-checkzone "student.in" /var/named/dns-student.in
 
 systemctl stop firewalld
 systemctl disable firewalld
