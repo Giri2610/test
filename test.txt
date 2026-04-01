@@ -233,6 +233,7 @@ iptables -F
 
 client-
 Browser- ip addr:80
+or http://ipaddr/index.html
 
 Apache add users port user1,user2
 server- 
