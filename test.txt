@@ -8,11 +8,6 @@ nano /etc/named.conf
 	listen-on v6 port 53 { any; };
 	allow-query     { any; };
 
-	forwarders {
-	8.8.8.8;
-	8.8.4.4;
-	};
-
 	zone "student.in" IN {
 	type master;
 	file "dns-student.in";
@@ -47,6 +42,66 @@ nslookup
 server ip addr
 ns.student.in
 www.student.in
+
+
+DNS Master Slave
+server-
+sudo su
+dnf install bind bind-utils -y
+
+nano /etc/named.conf
+	listen-on port 53 { ip addr };
+	listen-on v6 port 53 { any; };
+	allow-query     { any; };
+
+	zone "student.in" IN {
+	type master;
+	file "dns-student.in";
+	};
+named-checkconf /etc/named.conf
+
+cd /var/named
+vi dns-student.in
+	student.in. 3600 IN SOA student.in. root.student.in. (
+							20032026
+							1D
+							3H
+							1W
+							1H )
+	student.in. 3600 IN NS ns.student.in.
+	ns.student.in. 3600 IN A ip adr           #(master)
+	www.student.in. 3600 IN A 192.168.0.1    #(can be anything)
+	ns1.student.in. 3600 IN A ip adr          #(slave)
+	student.in. 3600 IN NS ns1.student.in.
+
+named-checkzone "student.in" dns-student.in
+systemctl restart named
+systemctl stop firewalld
+iptables -F
+setenforce 0
+
+client-
+sudo su
+dnf install bind bind-utils -y
+
+nano /etc/named.conf
+	listen-on port 53 { ip addr };
+	listen-on v6 port 53 { any; };
+	allow-query     { any; };
+
+	zone "student.in" IN {
+	type slave;
+	master { server ip}
+	file "dns-student.in";
+	};
+
+named-checkzone "student.in" dns-student.in
+systemctl restart named
+systemctl stop firewalld
+iptables -F
+setenforce 0
+systemctl status named
+
 
 Samba
 server-
@@ -114,10 +169,60 @@ username: smbuser1
 pass: 1234
 
 
+
+DHCP
+server-
+dnf install chrony kea -y
+systemctl enable kea-dhcp4.service
+iptables -F
+setenforce 0
+systemctl stop firewalld
+systemctl start kea-dhcp4.service
+
+vi /etc/kea/kea-dhcp4.conf
+	34- "interfaces":["enp0s3"]
+	152- "Data":"1.1.1.2"
+	162- "Data":"google.com"
+	171- "Data":"google.com"
+	237- "next server":"1.1.1.1"
+	238- "server hostname":"siri"
+	300- "subnet":"1.1.1.0/24"
+	307- "pools":[["pool":"1.1.1.21-1.1.1.248"]]
+	339- "Data":"1.1.1.1"
+	361-435 add // at start of lines
+
+systemctl restart kea-dhcp4.service
+systemctl enable kea-dhcp4.service
+
+client-
+su siri
+cd
+sudo nmcli con mod enp0s3 ipv4.method auto
+ip addr
+
+
 Apache
 server-
 sudo su
+ip addr
 dnf install httpd -y
+vi /etc/httpd/conf/httpd.conf
+	:set number
+	47- Listen *:80
+	101- ServerName www.giridhar.in:80 #remove cmd at strt
+	124- DocumentRoot "/website"
+	125- <Directory "/website">
+		 AllowOverride none
+		 Requireall granted
+		 </Directory>
+
+mkdir /website
+chown apache:apache /website
+cd /webstite
+vi index.html
+	Main Server
+chown apache:apache index.html
+
 systemctl start httpd
 systemctl enable httpd
 systemctl status httpd
@@ -125,47 +230,60 @@ systemctl status httpd
 systemctl stop firewalld
 systemctl disable firewalld
 iptables -F
+
+client-
+Browser- ip addr:80
+
+Apache add users port user1,user2
+server- 
+sudo su
 ip addr
-
-cd /var/www/html/
-nano /var/www/html/index.html
-	<html><body>
-	<h>Apache Server Working</h1>
-	<h2>Student Name</h2>
-	<body></html>
-chmod 777 /var/www/html/index.html
-
-mkdir -p /var/www/cdacec
-mkdir -p /var/www/cdackp
-nano /var/www/cdacec
-	<html><body>
-	<h>www.cdacec.in running on port 8080</h1>
-	<body></html>
-nano /var/www/cdackp
-	<html><body>
-	<h>www.cdackp.in running on port 8081</h1>
-	<body></html>
-
-nano /etc/httpd/conf/httpd.conf
-(at last)
-	Listen 8080
-	Listen 8081
-	<VirtualHost *:8080>
-	ServerName www.cdacec.in
-	DocumentRoot /var/www/cdacec
+dnf install httpd -y
+vi /etc/httpd/conf/httpd.conf
+	:set number
+	47- Listen *:8081
+	48- Listen *:8082
+	126- <Directory "/user1">
+		 AllowOverride none
+		 Requireall granted
+		 </Directory>
+		<Directory "/user2">
+		 AllowOverride none
+		 Requireall granted
+		 </Directory>
+	at last line- <VirtualHost *:8081>
+	ServerName www.user1.in
+	DocumentRoot /user1
 	</VirtualHost>
-	<VirtualHost *:8081>
-	ServerName www.cdackp.in
-	DocumentRoot /var/www/cdackp
+	<VirtualHost *:8082>
+	ServerName www.user2.in
+	DocumentRoot /user2
 	</VirtualHost>
 
+mkdir /user1
+mkdir /user2
+chown apache:apache /user1 /user2
+
+cd /user1
+vi index.html
+	This is user1
+chown apache:apache index.html
+cd
+cd /user2
+vi index.html
+	This is user2
+chown apache:apache index.html
+cd
+httpd -t #to check error
 systemctl restart httpd
 systemctl status httpd
+systemctl stop firewalld
+iptables -F
+setenforce 0
 
 client- 
-http://ip addr
-http://www.cdacec.in:8080
-http://www.cdackp.in:8081
+http://ip addr:8081
+http://ip addr:8082
 
 
 SSH
@@ -255,10 +373,11 @@ ftp localhost
 	ftp>get test.txt
 	ftp>bye
 
+
 Shell Script
 vi even_odd.sh
 	#!/bin/bash
-	echo "Enter number"
+	echo "Enter num"
 	read n
 	if (($n%2 = = 0))
 	then 
@@ -271,7 +390,7 @@ chmod +x even_odd.sh
 
 vi biggest.sh
 	#!/bin/bash
-	echo "Enter 3 numbers"
+	echo "Enter 3 nums"
 	read a b c
 	if (( $a>=$b && $a>=$c))
 	then
