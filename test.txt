@@ -170,7 +170,9 @@ pass: 1234
 
 
 
-DHCP
+DHCP server 2 adapters 1-internal n/w 2-bridged, slave - internal n/w
+ipv4 - manual - 1.1.1.1 255.255.255.0 1.1.1.0
+dns- 1.1.1.1
 server-
 dnf install chrony kea -y
 systemctl enable kea-dhcp4.service
@@ -289,7 +291,7 @@ http://ip addr:8082
 
 SSH
 server - 
-install,connect,create file
+install,create
 sudo su
 dnf install openssh-server -y
 
