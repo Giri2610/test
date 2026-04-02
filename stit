@@ -1,0 +1,273 @@
+DHCP 
+Step 1 
+Goto to vm change network in virtual box
+Adapter1 internal network
+Adapter2 bridge network
+Step2 
+$sudo su
+#hostnamectl hostname <hostname> //change ur hostname as given or whatever u wanna write
+#dnf  install kea -y
+
+Goto network then goto IPV4
+Change it to manual
+Address 1.1.1.1
+Netmask 255.255.255.0
+Gateway 1.1.1.1
+DNS 1.1.1.1
+
+Backto terminal
+#cd /etc/kea
+#cp kea-dhcp4.conf kea-chcp4.backup    //making backup
+#vi kea-dhcp4.conf
+Press shift+colon (:) , write :set nu   ,press enter  //set numbers
+Line 361,435
+Press shift+colon (:) , :361,435 s/^/\/\//
+Press i to edit
+Line34 *interface*: [enp0s3]
+Line 151-152 *name*: “domain-name-servers”,
+                      *data*: 1.1.1.1, 8.8.8.8”
+Line 162-171 *data*: “google.com”
+                       *data*: “google.com”
+Line 237 “next-server”: “1.1.1.1”,
+               “server-hostname”: “<hostname>”
+Line300 “subnet”: “1.1.1.0/24”,
+	  “pools”: [ { “pool”: “1.1.1.11 - 1.1.1.100” } ],
+Line339 “data”: “1.1.1.1”
+Press e        //if colon is not coming at the botton
+Press shift+colon (:) , :361,435 s/^/\/\//
+#chown root:kea kea-dhcp4.conf
+#systemctl start kea-dhcp4.service
+#systemctl status kea-dhcp4.service
+#systemctl stop firewalld
+#iptables -F
+#setenforce 0
+
+
+Goto client OS
+#nmcli con mod enp0s3 ipv4.method
+#ip a
+
+____________________
+
+DNS
+#sudo su
+#dnf install bind bind-utils -y
+#nano /etc/named.conf
+
+In options add,
+listen-on port 53 { your IP; };
+listen-on-v6 port 53 { any; };
+allow-query     { any; };
+
+Add,
+forwarders {
+8.8.8.8;
+8.8.4.4;
+};
+
+Add at the bottom,
+zone "student.in" IN {
+         type master;
+         file "dns-student.in";
+};
+
+#cd /var/named
+#nano dns-student.in
+Add this,
+student.in.           3600   IN  SOA    student.in. root.student.in. (
+                                                        20032026 ; serial
+                                                        1D ; refresh
+                                                        3H ; retry
+                                                        1W ; expiry
+                                                        1H ; minimal
+                                                         )
+student.in.           3600   IN  NS      ns.student.in.
+ns.student.in.      3600   IN  A         <your ip>
+www.student.in.  3600   IN  A         192.168.0.1
+ctrl+x
+#chmod 777 /var/named/dns-student.in
+#named-checkconf
+#named-checkzone student.in /var/named/dns-student.in
+#systemctl stop firewalld
+#iptables -F
+#systemctl start named
+#systemctl enable named
+Goto command prompt in windows
+nslookup 
+server <your ip>
+For reverse zone
+vi /etc/named.conf
+At bottom add,
+zone "1.168.192.in-addr.arpa" IN {
+    type master;
+    file "reverse.zone";
+};
+Reverse zone file
+vi /var/named/reverse.zone
+student.in.           3600   IN  SOA    student.in. root.student.in. (
+                                                        20032026 ; serial
+                                                        1D ; refresh
+                                                        3H ; retry
+                                                        1W ; expiry
+                                                        1H ; minimal
+                                                         )
+student.in.           3600   IN  NS          ns.student.in.
+
+1                          3600   IN  PTR       ns.student.in.
+10                        3600   IN  PTR         mail.student.in
+20                        3600   IN  PTR          web.student.in
+#chown named:named /var/named/*
+#chmod 755 /var/named/*
+#systemctl start named
+#systemctl enable named
+__________
+Samba 
+#sudo su
+#dnf install samba samba-client samba-common -y
+#cp /etc/samba/smb.conf /etc/samba/smb.conf.original
+#mkdir -p /srv/samba/private
+#mkdir -p /srv/samba/public
+#chmod 0777 /srv/samba/public
+#chmod 2770 /srv/samba/private
+#ls -la /srv/samba/
+#chown nobody:nobody /srv/samba
+#chown -R root:sambashare /srv/samba/private/
+#useradd -s /sbin/nologin -m smbuser1
+#useradd -s /sbin/nologin -m smbuser2
+#groupadd sambashare
+#usermod -aG sambashare smbuser1
+#usermod -aG sambashare smbuser2
+#smbpasswd -a smbuser1
+#smbpasswd -a smbuser2
+Open config
+#nano /etc/samba/smb.conf
+[public]
+	comment = Public samba share
+	path = /srv/samba/public
+	browseable = yes
+	writable = yes
+	guest ok =yes
+	read only = no
+	create mask = 0664
+	directory mask = 0775
+[private]
+	comment = private
+	Path /srv/samba/private
+	Browse = yes
+readonly = no
+	valid user = @sambashare
+	write list = @sambashare
+	create mask = 0660
+	directory mask = 0770
+	force group = sambashare
+ctrl+x
+#nano /srv/samba/private/test.txt
+#systemctl restart smb
+Goto command prompt in windows
+\\<server-ip>\Share
+__________________
+SSH 
+ON CLONE OS
+#sudo su
+#dnf install openssh-server -y
+#systemctl start sshd
+#systemctl enable sshd
+#systemctl status sshd
+#systemctl stop firewalld
+#systemctl disable firewalld
+#systemctl status firewalld
+#ip a
+ON MAIN OS
+#dnf install openssh-server -y
+#ssh username@clone_ip
+touch text.txt
+#Ls
+Edit SSH config
+ON CLONE
+#sudo su
+#nano /etc/ssh/sshd_config
+Find:
+#Port 22
+Change to:
+Port 8080
+ctrl+x
+#systemctl restart sshd
+ON MAIN
+#ssh -p 8080 username@clone_ip
+Root permission
+$sudo su
+#nano /etc/ssh/sshd_config
+FIND AND CHANGE
+PermitRootLogin yes
+PasswordAuthentication yes
+#passwd root
+#ssh root@clone_ip
+____________________
+FTP
+ON CLONE
+sudo su
+dnf install vsftpd -y
+systemctl start vsftpd
+systemctl enable vsftpd
+systemctl status vsftpd
+systemctl stop firewalld
+systemctl disable firewalld
+nano /etc/vsftpd/vsftpd.conf
+changes
+anonymous_enable=NO
+local_enable=YES
+write_enable=YES
+CTRL + X,y,enter
+systemctl restart vsftpd
+touch test.txt
+ON MAIN
+sudo su
+touch PRN.txt
+ftp <clone ip>
+put PRN.txt
+ON CMD OR CLONE
+ftp <clone ip>
+Get PRN.txt
+
+APACHE WEBSERVER HTTP
+#dnf install httpd
+#nano /etc/httpd/conf/httpd.conf
+
+Line47 Listen <ip>:80
+Line100 Server Name www.shreya.in:80
+Line124 DocumentRoot /website
+LINE125 <Directory “/Website”>
+	    Allow Override None
+	    #Allow open access:
+	    Require all granted
+</Directory>
+#cd /website
+#nano index.html
+<h>sdfdff</h>
+#chown apache:apache index.html
+#systemctl start httpd
+#systemctl status httpd
+#systemctl stop firewalld
+#iptables -F
+#setenforce 0
+Open firefox 
+http://ip/index.html
+Reverse Proxy
+#dnf install httpd -y
+#vi /etc/httpd/conf/httpd.conf
+Uncomment/add:
+LoadModule proxy_module modules/mod_proxy.so
+LoadModule proxy_http_module modules/mod_proxy_http.so
+#vi /etc/httpd/conf.d/proxy.conf
+<VirtualHost *:80>
+   ServerName server1
+
+   ProxyPreserveHost On
+   ProxyPass / http://192.168.1.2/
+   ProxyPassReverse / http://192.168.1.2/
+</VirtualHost>
+#systemctl start httpd
+#systemctl enable httpd
+
+
+
