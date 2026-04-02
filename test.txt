@@ -288,6 +288,24 @@ client-
 http://ip addr:8081
 http://ip addr:8082
 
+Apache Reverse Proxy
+#dnf install httpd -y
+#vi /etc/httpd/conf/httpd.conf
+Uncomment/add:
+LoadModule proxy_module modules/mod_proxy.so
+LoadModule proxy_http_module modules/mod_proxy_http.so
+#vi /etc/httpd/conf.d/proxy.conf
+<VirtualHost *:80>
+   ServerName server1
+
+   ProxyPreserveHost On
+   ProxyPass / http://192.168.1.2/
+   ProxyPassReverse / http://192.168.1.2/
+</VirtualHost>
+#systemctl start httpd
+#systemctl enable httpd
+
+
 
 SSH
 server - 
